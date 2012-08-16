@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>WebGL/Three.js / Shader / dat.gui Sandbox</title>
+		<script src="js/lib/jquery.min.js"></script>
+		<script src="js/lib/stats.js"></script>
+		<script src="js/lib/three.js"></script>
+		<script src="js/lib/threejs/OrbitControls.js"></script>
+		<script src="js/lib/dat.gui.js"></script>
+
+		<script src="js/properties.js"></script>
+		<script src="js/program.js"></script>
+		<script src="js/main.js"></script>
+
+    	<link href="css/sandbox.css" rel="stylesheet">
+
+		<style>
+			body {
+				background-color: #eee;
+			}
+			
+			div#info {
+				width: 100%;
+				text-align: center;
+			}
+
+			@media (max-width: 480px) {
+				div.dg.ac { display: none; } 
+			}
+		</style>
+	</head>
+
+	<body>
+		<div id="info">Shader GUI Example</div>
+	</body>
+
+	<!-- 
+
+	SHADERS: used in main.js / utils.js
+
+	-->
+	<script id="shader-vs" type="x-shader/x-vertex">
+		varying vec2 vUv;
+
+		void main()
+		{
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+		}
+	</script>
+
+	<script id="shader-fs-stripes" type="x-shader/x-fragment">
+		uniform int vertical;
+		uniform int noise;
+		uniform int useModelCoordinates;
+
+		uniform vec3 colorOne;
+		uniform vec3 colorTwo;
+		uniform float width;
+		uniform float antialias;
+		uniform float frequency;
+
+		varying float stripe;
+
+		varying vec2 vUv;
+
+		void main()
+		{
+			vec2 coord;
+			if (noise == 1)
+				coord = gl_FragColor.xy;
+			else if (useModelCoordinates == 0)
+				coord = gl_FragCoord.xy;
+			else
+				coord = vUv;
+
+			float coordinate;
+			if (vertical == 0)
+				coordinate = coord.x;
+			else
+				coordinate = coord.y;
+
+			float scaledT = fract(coordinate * frequency);
+
+			float frac1 = clamp(scaledT / antialias, 0.0, 1.0);
+			float frac2 = clamp((scaledT - width) / antialias, 0.0, 1.0);
+
+			frac1 = frac1 * (1.0 - frac2);
+			frac1 = frac1 * frac1 * (3.0 - (2.0 * frac1));
+
+			vec3 finalColor = mix(colorOne, colorTwo, frac1);
+			gl_FragColor = vec4(finalColor, 1.0);
+		}
+	</script>
+
+	<script id="shader-fs-bricks" type="x-shader/x-fragment">
+		uniform int noise;
+		uniform int useModelCoordinates;
+
+		uniform vec3 colorOne;
+		uniform vec3 colorTwo;
+		uniform float width;
+		uniform float frequency;
+
+		varying vec2 vUv;
+
+		void main()
+		{
+			vec2 coord;
+			if (noise == 1)
+				coord = gl_FragColor.xy;
+			else if (useModelCoordinates == 0)
+				coord = gl_FragCoord.xy;
+			else
+				coord = vUv;
+
+			// GLSL cookbook derived:
+			vec2 brickSize = vec2(0.3, width);
+			vec2 brickPct = vec2(0.9, 1.0 - width);
+
+			vec3 color;
+			vec2 position, useBrick;
+
+			// get a "brick row #"
+			position = coord / brickSize / ( 1.0 / frequency);
+
+			// are we in an offset row?
+			if (fract(position.y * 0.5) > 0.5)
+				position.x += 0.5;
+
+			// compute fragment's location in current brick:
+			position = fract(position);
+
+			useBrick = step(position, brickPct);
+
+			color = mix(colorOne, colorTwo, useBrick.x * useBrick.y);
+			gl_FragColor = vec4(color, 1.0);
+		}
+	</script>
+
+	<script id="shader-fs-checkers" type="x-shader/x-fragment">
+		uniform int noise;
+		uniform int useModelCoordinates;
+
+		uniform vec3 colorOne;
+		uniform vec3 colorTwo;
+		uniform float frequency;
+
+		varying vec2 vUv;
+
+		// extension for derivatives (not using)
+    	// #extension GL_OES_standard_derivatives : enable
+		void main()
+		{
+			vec2 coord;
+			if (noise == 1)
+				coord = gl_FragColor.xy;
+			else if (useModelCoordinates == 0)
+				coord = gl_FragCoord.xy;
+			else
+				coord = vUv;
+
+			vec2 checkPos = fract(coord * frequency);
+			vec2 p = smoothstep(vec2(0.5), vec2(0.5), checkPos);
+
+			vec3 color = mix(colorTwo, colorOne, p.x * p.y + (1.0 - p.x) * (1.0 - p.y));
+
+			gl_FragColor = vec4(color, 1.0);
+		}
+	</script>
+</html>
